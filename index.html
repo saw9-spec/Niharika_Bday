@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>THE ART OF BECOMING — A Living Museum</title>
+    <style>
+        :root {
+            /* Dynamic Palette Variables - Updated via JS */
+            --bg-color: #050507;
+            --text-main: #f0f0f0;
+            --text-muted: #88888a;
+            --accent-primary: #3b5f6b;
+            --accent-glow: rgba(59, 95, 107, 0.3);
+            
+            /* Fonts */
+            --font-editorial: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+            --font-tech: 'Courier New', Courier, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            
+            /* Timing */
+            --transition-slow: 2s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-med: 1s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* UI */
+            --z-bg: 0;
+            --z-canvas: 1;
+            --z-room: 10;
+            --z-ui: 100;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-editorial);
+            transition: background-color var(--transition-slow), color var(--transition-slow);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: var(--z-canvas);
+            pointer-events: none;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: var(--z-ui);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition-med);
+        }
+
+        #ui-layer.visible {
+            opacity: 1;
+        }
+
+        .museum-nav {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            font-family: var(--font-sans);
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .progress-line-container {
+            width: 150px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .progress-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--text-main);
+            width: 0%;
+            transition: width var(--transition-slow);
+        }
+
+        .audio-toggle {
+            pointer-events: auto;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            cursor: pointer;
+            outline: none;
+            transition: color 0.3s;
+        }
+
+        .audio-toggle:hover {
+            color: var(--text-main);
+        }
+
+        .continue-hint {
+            position: absolute;
+            right: 3rem;
+            bottom: 2rem;
+            font-family: var(--font-sans);
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            color: var(--text-muted);
+            animation: pulseHint 3s infinite;
+            pointer-events: auto;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        .continue-hint.show {
+            opacity: 1;
+        }
+
+        @keyframes pulseHint {
+            0%, 100% { opacity: 0.3; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(5px); }
+        }
+
+        .room {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: var(--z-room);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity var(--transition-slow), visibility var(--transition-slow), transform var(--transition-slow);
+            transform: scale(0.98) translateY(10px);
+            padding: 4rem;
+        }
+
+        .room.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: scale(1) translateY(0);
+        }
+
+        .room.prev {
+            transform: scale(1.02) translateY(-10px);
+        }
+
+        /* ROOM 00: Invitation */
+        #room-0 .title-sequence {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .fade-text {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 2s ease, transform 2s ease;
+        }
+        
+        .fade-text.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .exhibit-label {
+            font-family: var(--font-sans);
+            font-size: 0.7rem;
+            letter-spacing: 0.4em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .main-title {
+            font-size: 3rem;
+            font-weight: normal;
+            letter-spacing: 0.1em;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .enter-btn {
+            margin-top: 3rem;
+            padding: 1rem 2rem;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .enter-btn:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.5);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        #room-1 {
+            justify-content: flex-start;
+            padding-top: 15vh;
+        }
+
+        .archival-wall {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            justify-content: center;
+            max-width: 1000px;
+            margin-bottom: 4rem;
+            perspective: 1000px;
+        }
+
+        .artifact {
+            width: 180px;
+            height: 240px;
+            background: rgba(20, 20, 22, 0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-family: var(--font-tech);
+            font-size: 0.7rem;
+            color: #555;
+            transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            cursor: default;
+        }
+
+        .artifact:hover {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            background: rgba(30, 32, 35, 0.9);
+            transform: translateZ(30px) scale(1.05);
+            box-shadow: 0 20px 40px var(--accent-glow);
+        }
+
+        .editorial-statement {
+            font-size: 1.8rem;
+            line-height: 1.5;
+            text-align: center;
+            max-width: 800px;
+            opacity: 0;
+            transition: opacity 2s 1s;
+        }
+        
+        .active .editorial-statement {
+            opacity: 1;
+        }
+
+        .emphasis {
+            font-style: italic;
+            color: var(--accent-primary);
+            display: block;
+            margin-top: 1rem;
+        }
+
+        /* ROOM 02: The Pattern */
+        #room-2 {
+            pointer-events: none; /* Let canvas handle interactions if any */
+        }
+        
+        .pattern-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 2;
+        }
+
+        .pattern-text h2 {
+            font-size: 2.5rem;
+            font-weight: normal;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transition: opacity 2s;
+        }
+
+        .active .pattern-text h2:nth-child(1) { transition-delay: 1s; opacity: 1; }
+        .active .pattern-text h2:nth-child(2) { transition-delay: 4s; opacity: 1; }
+        .active .pattern-text h2:nth-child(3) { 
+            transition-delay: 7s; 
+            opacity: 1; 
+            font-family: var(--font-sans);
+            letter-spacing: 0.5em;
+            font-size: 1rem;
+            color: var(--accent-primary);
+            margin-top: 3rem;
+        }
+
+        /* ROOM 03 is primarily canvas */
+        .constellation-text {
+            position: absolute;
+            bottom: 20%;
+            text-align: center;
+            max-width: 600px;
+            font-size: 1.4rem;
+            line-height: 1.6;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+
+        /* ROOM 04: The Reveal */
+        #room-4 {
+            background: #000; /* Force dark */
+        }
+
+        .spotlight {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 40%, rgba(166, 128, 81, 0.15) 0%, transparent 40%);
+            opacity: 0;
+            transition: opacity 4s;
+        }
+
+        .active .spotlight { opacity: 1; }
+
+        .reveal-text {
+            position: absolute;
+            top: 70%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            font-size: 1.2rem;
+        }
+
+        .reveal-text span {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 2s, transform 2s;
+        }
+
+        .kuchipudi-reveal {
+            font-family: var(--font-sans);
+            font-size: 2rem;
+            letter-spacing: 0.4em;
+            color: var(--accent-primary);
+            margin-top: 2rem;
+        }
+
+        /* ROOM 05: The Stage */
+        .stage-container {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .curtain {
+            position: absolute;
+            top: 0;
+            width: 50vw;
+            height: 100%;
+            background: linear-gradient(to right, #2b0f14, #1a080c);
+            z-index: 5;
+            transition: transform 3s cubic-bezier(0.6, 0.05, 0.28, 0.91);
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .curtain.left { left: 0; transform-origin: left; }
+        .curtain.right { right: 0; transform-origin: right; }
+
+        .active .curtain.left { transform: scaleX(0.1); }
+        .active .curtain.right { transform: scaleX(0.1); }
+
+        .dancer-svg-container {
+            width: 300px;
+            height: 500px;
+            position: relative;
+            z-index: 2;
+            filter: drop-shadow(0 0 20px rgba(201, 158, 95, 0.2));
+            opacity: 0;
+            transition: opacity 3s 1s;
+        }
+        
+        .active .dancer-svg-container { opacity: 1; }
+
+        /* SVG Dancer Animations */
+        .dancer-part {
+            fill: none;
+            stroke: var(--accent-primary);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .mudra-label {
+            position: absolute;
+            font-family: var(--font-sans);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            color: var(--text-muted);
+            cursor: crosshair;
+            transition: all 0.3s;
+            padding: 1rem;
+        }
+
+        .mudra-label:hover {
+            color: var(--text-main);
+            transform: scale(1.1);
+        }
+
+        .mudra-caption {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            text-align: center;
+            font-family: var(--font-editorial);
+            font-size: 0.8rem;
+            font-style: italic;
+            color: var(--accent-primary);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            margin-top: 0.5rem;
+        }
+
+        .mudra-label:hover .mudra-caption {
+            opacity: 1;
+        }
+
+        /* Positional classes for mudras */
+        .m-gesture { top: 20%; left: 15%; }
+        .m-rhythm { top: 60%; left: 10%; }
+        .m-balance { bottom: 10%; left: 30%; }
+        .m-precision { top: 25%; right: 15%; }
+        .m-expression { top: 55%; right: 10%; }
+
+        /* ROOM 06: The Connection */
+        .split-view {
+            display: flex;
+            width: 100%;
+            height: 60vh;
+            position: relative;
+        }
+        
+        .split-half {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 2rem;
+            opacity: 0;
+            transition: opacity 1.5s;
+        }
+
+        .split-tech {
+            font-family: var(--font-tech);
+            color: #5c97a8;
+            text-align: right;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .split-dance {
+            color: #d4af37;
+            text-align: left;
+        }
+
+        .active .split-half { opacity: 1; }
+
+        .connection-thesis {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: var(--bg-color);
+            padding: 2rem;
+            box-shadow: 0 0 40px var(--bg-color);
+            opacity: 0;
+            transition: opacity 1.5s 1.5s;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .active .connection-thesis { opacity: 1; }
+
+        /* ROOM 07: Celebration */
+        #room-7 {
+            justify-content: flex-start;
+            overflow-y: auto;
+            padding-top: 15vh;
+            padding-bottom: 15vh;
+            scrollbar-width: none; /* Hide scrollbar for cinematic feel */
+        }
+        
+        #room-7::-webkit-scrollbar {
+            display: none;
+        }
+
+        .celebration-content {
+            text-align: center;
+            z-index: 5;
+            margin-bottom: 3rem;
+            flex-shrink: 0;
+        }
+
+        .bday-title {
+            font-size: 3.5rem;
+            font-weight: normal;
+            letter-spacing: 0.1em;
+            color: var(--accent-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .bday-telugu {
+            font-family: var(--font-sans);
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
+            letter-spacing: 0.05em;
+        }
+
+        .bday-mantra {
+            font-size: 1.4rem;
+            font-style: italic;
+            margin-bottom: 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .wishes-archive {
+            display: flex;
+            gap: 2rem;
+            overflow-x: auto;
+            max-width: 90vw;
+            padding: 2rem 1rem;
+            scrollbar-width: none; /* Firefox */
+            flex-shrink: 0;
+        }
+        
+        .wishes-archive::-webkit-scrollbar { display: none; }
+
+        .wish-card {
+            min-width: 280px;
+            background: rgba(255,250,240, 0.03);
+            border: 1px solid rgba(242, 166, 90, 0.2);
+            padding: 2rem;
+            border-radius: 4px;
+            position: relative;
+            transition: transform 0.4s;
+        }
+
+        .wish-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255,250,240, 0.05);
+        }
+
+        .wish-label {
+            font-family: var(--font-sans);
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 120px;
+            border: 1px dashed rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-sans);
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 1rem;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .main-title { font-size: 2rem; }
+            .archival-wall { gap: 0.5rem; }
+            .artifact { width: 140px; height: 180px; font-size: 0.6rem; }
+            .editorial-statement { font-size: 1.2rem; }
+            .split-view { flex-direction: column; height: 80vh; }
+            .split-tech { text-align: center; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2rem;}
+            .split-dance { text-align: center; padding-top: 2rem;}
+            .thesis-main { font-size: 1.4rem; }
+            .bday-title { font-size: 2rem; }
+            .room { padding: 2rem; }
+            #room-7 { padding-top: 10vh; }
+            .dancer-svg-container { width: 200px; height: 350px; }
+            #ui-layer { padding: 1.5rem; }
+            .progress-line-container { width: 80px; }
+            .mudra-label { position: relative; top: auto; left: auto; right: auto; bottom: auto; display: inline-block; margin: 0.5rem;}
+            .stage-container { flex-direction: column; }
+        }
+
+        /* Accessibility: Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Canvas for procedural graphics (Pattern, Constellation, Particles) -->
+    <div id="canvas-container">
+        <canvas id="bg-canvas"></canvas>
+    </div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <div class="museum-nav">
+            <span id="room-indicator">ROOM 00 / 07</span>
+            <div class="progress-line-container">
+                <div class="progress-line" id="progress-line"></div>
+            </div>
+        </div>
+        <button class="audio-toggle" id="mute-btn" title="Toggle Audio">🔊</button>
+        <div class="continue-hint" id="continue-hint">CONTINUE &rarr;</div>
+    </div>
+
+    <!-- ROOM 00: The Invitation -->
+    <div class="room active" id="room-0">
+        <div class="title-sequence">
+            <div class="exhibit-label fade-text">EXHIBIT 01</div>
+            <h1 class="main-title fade-text">THE ART OF BECOMING</h1>
+            <div class="subtitle fade-text">An installation created for Niharika.</div>
+            <button class="enter-btn fade-text" id="enter-btn">ENTER EXHIBITION</button>
+        </div>
+    </div>
+
+    <!-- ROOM 01: The Work -->
+    <div class="room" id="room-1">
+        <div class="archival-wall">
+            <div class="artifact">WORK ALLOCATION<br><br>SYS_TRC_901</div>
+            <div class="artifact">SCENARIO ASSIGNMENT<br><br>MAT_IDX_44</div>
+            <div class="artifact">CAMS<br><br>SYNC_REQ_00</div>
+            <div class="artifact">MACHINE READINESS<br><br>CHK_LST_OK</div>
+            <div class="artifact">STE SUPPORT<br><br>ENV_STABLE</div>
+            <div class="artifact">LEAD COORDINATION<br><br>NODE_SYNC</div>
+            <div class="artifact">WHATEVER NEEDED<br>TO BE DONE<br><br>EXEC_ANY</div>
+        </div>
+        <div class="editorial-statement">
+            Some people complete their role. <br>
+            Some people quietly expand it.
+            <span class="emphasis">Niharika kept becoming the person the work needed.</span>
+        </div>
+    </div>
+
+    <!-- ROOM 02: The Pattern (Canvas heavily utilized here) -->
+    <div class="room" id="room-2">
+        <div class="pattern-text">
+            <h2>Precision creates patterns.</h2>
+            <h2>Patterns become instinct.</h2>
+            <h2>TIMING</h2>
+        </div>
+    </div>
+
+    <!-- ROOM 03: The One Who Learns (Constellation rendered in Canvas) -->
+    <div class="room" id="room-3">
+        <div class="constellation-text">
+            The impressive part isn't how much she knows.<br>
+            It's how quickly she keeps becoming someone who knows more.
+        </div>
+    </div>
+
+    <!-- ROOM 04: The Reveal -->
+    <div class="room" id="room-4">
+        <div class="spotlight"></div>
+        <div class="dancer-silhouette-placeholder" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); opacity: 0.3;">
+             <!-- Silhouette drawn via canvas/CSS lines in JS -->
+        </div>
+        <div class="reveal-text" id="reveal-text-container">
+            <span>The same precision. A different stage.</span>
+            <span>The same discipline. A different language.</span>
+            <span class="kuchipudi-reveal">KUCHIPUDI</span>
+        </div>
+    </div>
+
+    <!-- ROOM 05: The Stage -->
+    <div class="room" id="room-5">
+        <div class="stage-container">
+            <div class="curtain left"></div>
+            <div class="curtain right"></div>
+            
+            <div class="dancer-svg-container">
+                <!-- Procedural Stylized Kuchipudi Silhouette SVG -->
+                <svg viewBox="0 0 200 400" width="100%" height="100%">
+                    <g class="dancer-rig" stroke-width="3" stroke="var(--accent-primary)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Head -->
+                        <circle cx="100" cy="50" r="15" fill="rgba(201, 158, 95, 0.1)"/>
+                        <!-- Torso -->
+                        <path d="M 100 65 Q 110 100 100 140" />
+                        <!-- Left Arm (Tribhanga posture) -->
+                        <path d="M 100 70 Q 60 80 50 110 Q 60 140 80 130" />
+                        <!-- Right Arm (Extended Mudra) -->
+                        <path d="M 100 70 Q 140 75 160 90 Q 180 80 190 60" />
+                        <!-- Hips/Skirt -->
+                        <path d="M 100 140 L 60 220 L 140 220 Z" fill="rgba(201, 158, 95, 0.05)"/>
+                        <path d="M 70 220 Q 100 280 130 220" stroke-width="1" />
+                        <!-- Legs (Aramandi posture) -->
+                        <path d="M 80 220 Q 50 260 70 310 L 85 315" />
+                        <path d="M 120 220 Q 150 260 130 310 L 115 315" />
+                        
+                        <!-- Decorative subtle jewelry lines -->
+                        <circle cx="100" cy="50" r="18" stroke-width="0.5" stroke="var(--accent-primary)" stroke-dasharray="2 2"/>
+                        <path d="M 90 85 Q 100 95 110 85" stroke-width="1"/>
+                    </g>
+                </svg>
+                
+                <div class="mudra-label m-gesture">GESTURE
+                    <div class="mudra-caption">Every movement has intention.</div>
+                </div>
+                <div class="mudra-label m-rhythm">RHYTHM
+                    <div class="mudra-caption">Timing turns movement into language.</div>
+                </div>
+                <div class="mudra-label m-balance">BALANCE
+                    <div class="mudra-caption">Control makes complexity look effortless.</div>
+                </div>
+                <div class="mudra-label m-precision">PRECISION
+                    <div class="mudra-caption">Accuracy is the foundation of grace.</div>
+                </div>
+                <div class="mudra-label m-expression">EXPRESSION
+                    <div class="mudra-caption">The unwritten lines between the code.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROOM 06: The Connection -->
+    <div class="room" id="room-6">
+        <div class="split-view">
+            <div class="split-half split-tech">
+                <p>trace_exec();</p>
+                <p>assert(timing === EXACT);</p>
+                <p>await ready_state;</p>
+                <p>resolve(conflict);</p>
+                <br>
+                <p style="opacity: 0.5">/* End of module */</p>
+            </div>
+            <div class="split-half split-dance">
+                <p>Taka dhimi tha</p>
+                <p>Samam (Balance)</p>
+                <p>Laya (Tempo)</p>
+                <p>Bhava (Expression)</p>
+                <br>
+                <p style="opacity: 0.5">/* Beginning of rhythm */</p>
+            </div>
+            <div class="connection-thesis">
+                <div class="thesis-main">Different worlds. Same discipline.</div>
+                <p style="color: var(--text-muted); line-height: 1.6;">
+                    She doesn't just bring dedication to the work.<br>
+                    She brings rhythm, precision, patience and grace.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROOM 07: The Celebration -->
+    <div class="room" id="room-7">
+        <div class="celebration-content">
+            <h1 class="bday-title">HAPPY BIRTHDAY, NIHARIKA</h1>
+            <div class="bday-telugu">పుట్టినరోజు శుభాకాంక్షలు</div>
+            
+            <div class="bday-mantra">
+                <span>Keep learning.</span>
+                <span>Keep creating.</span>
+                <span>Keep dancing.</span>
+                <span>Keep becoming.</span>
+            </div>
+            
+            <p style="max-width: 600px; margin: 0 auto; color: var(--text-muted); line-height: 1.8;">
+                Here's to everything you've already become, <br>
+                everything you're building, <br>
+                and everything still waiting for you on the other side of the stage.
+            </p>
+        </div>
+
+        <!-- Archive of Wishes -->
+        <div class="wishes-archive">
+            <div class="wish-card">
+                <span class="wish-label">ARCHIVE NOTE / 001</span>
+                <div class="photo-placeholder"><img src="photo1.jpg" style="width:100%;border-radius:14px"></div>
+                <p style="font-size: 0.9rem; line-height: 1.5;">v-nivutukuri</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">To the one who treats every project like a flawlessly choreographed performance—precise, graceful, and always delivered on time. Thank you for bringing your signature calm to the team. Happy Birthday!</p>
+            </div>
+            <div class="wish-card">
+                <span class="wish-label">ARCHIVE NOTE / 002</span>
+                <div class="photo-placeholder"><img src="photo2.jpg" style="width:100%;border-radius:14px"></div>
+                <p style="font-size: 0.9rem; line-height: 1.5;">From Team</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">May your year ahead have zero critical bugs, 100% test coverage, and plenty of time for the stage. You bring the best rhythm to our workflows. Happy Birthday!</p>
+            </div>
+            <div class="wish-card" style="opacity: 0.5; border-style: dashed;">
+                <span class="wish-label">From Anshika</span>
+                <p style="font-size: 0.8rem; text-align: center; margin-top: 2rem;">To my amazing Di: You bring so much beauty and order to everything you do. But for today, put the code and the ghungroos away—it's officially time for the most important task of the day: cutting the cake and eating as much as we want. Happy Birthday!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * CORE STATE & CONFIG
+         */
+        const TOTAL_ROOMS = 8; // 0 to 7
+        let currentRoom = 0;
+        let isTransitioning = false;
+        let isAudioInitialized = false;
+        let isMuted = false;
+        let prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // Palettes defining the narrative arc
+        const palettes = [
+            { bg: '#050507', main: '#e0e0e0', muted: '#666', accent: '#3b5f6b' }, // 0: Invitation (Charcoal/Cyan)
+            { bg: '#08090a', main: '#d0d0d0', muted: '#777', accent: '#4a7c8c' }, // 1: Work (Archival)
+            { bg: '#0d1014', main: '#e8e8e8', muted: '#888', accent: '#5c97a8' }, // 2: Pattern (Tech to Kolam)
+            { bg: '#171614', main: '#d9d2c5', muted: '#999', accent: '#8c7050' }, // 3: Learner (Parchment/Gold)
+            { bg: '#050403', main: '#c2b5a3', muted: '#555', accent: '#a68051' }, // 4: Reveal (Black out)
+            { bg: '#1c0a0d', main: '#e6d8c3', muted: '#a38288', accent: '#c99e5f' }, // 5: Stage (Maroon/Temple Gold)
+            { bg: '#140c0e', main: '#e8dcc8', muted: '#9e7b82', accent: '#d4af37' }, // 6: Connection
+            { bg: '#2b1010', main: '#ffedd6', muted: '#d9a3a3', accent: '#f2a65a' }  // 7: Celebration (Vermillion/Marigold)
+        ];
+
+        const rootStyle = document.documentElement.style;
+
+        function updatePalette(index) {
+            const p = palettes[index];
+            rootStyle.setProperty('--bg-color', p.bg);
+            rootStyle.setProperty('--text-main', p.main);
+            rootStyle.setProperty('--text-muted', p.muted);
+            rootStyle.setProperty('--accent-primary', p.accent);
+            rootStyle.setProperty('--accent-glow', `rgba(${hexToRgb(p.accent)}, 0.3)`);
+        }
+
+        function hexToRgb(hex) {
+            let r = 0, g = 0, b = 0;
+            if (hex.length === 4) {
+                r = parseInt(hex[1] + hex[1], 16);
+                g = parseInt(hex[2] + hex[2], 16);
+                b = parseInt(hex[3] + hex[3], 16);
+            } else if (hex.length === 7) {
+                r = parseInt(hex.substring(1, 3), 16);
+                g = parseInt(hex.substring(3, 5), 16);
+                b = parseInt(hex.substring(5, 7), 16);
+            }
+            return `${r}, ${g}, ${b}`;
+        }
+
+        /**
+         * WEB AUDIO API ENGINE
+         */
+        let audioCtx;
+        let masterGain;
+        let ambientOsc;
+        let ambientGain;
+
+        function initAudio() {
+            if (isAudioInitialized) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                masterGain = audioCtx.createGain();
+                masterGain.connect(audioCtx.destination);
+                masterGain.gain.value = isMuted ? 0 : 0.6;
+
+                // Ambient Drone
+                ambientOsc = audioCtx.createOscillator();
+                ambientGain = audioCtx.createGain();
+                ambientOsc.type = 'sine';
+                ambientOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1
+                
+                // Add slow LFO to drone volume
+                const lfo = audioCtx.createOscillator();
+                lfo.type = 'sine';
+                lfo.frequency.value = 0.1; // Very slow
+                const lfoGain = audioCtx.createGain();
+                lfoGain.gain.value = 0.05;
+                lfo.connect(lfoGain);
+                lfoGain.connect(ambientGain.gain);
+                
+                ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                ambientOsc.connect(ambientGain);
+                ambientGain.connect(masterGain);
+                
+                ambientOsc.start();
+                lfo.start();
+                
+                ambientGain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 2);
+                
+                isAudioInitialized = true;
+            } catch (e) {
+                console.warn("Web Audio API not supported", e);
+            }
+        }
+
+        // Procedural synthetic Ghungroo (metallic bells)
+        function playGhungrooBurst() {
+            if (!isAudioInitialized || isMuted || !audioCtx) return;
+            
+            const numBells = 4;
+            const baseFreqs = [3000, 3500, 4200, 5000];
+            
+            for (let i = 0; i < numBells; i++) {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                // Slightly randomize frequencies for metallic cluster effect
+                osc.type = (i % 2 === 0) ? 'triangle' : 'square';
+                osc.frequency.setValueAtTime(baseFreqs[i] + (Math.random() * 500 - 250), audioCtx.currentTime);
+                
+                osc.connect(gainNode);
+                gainNode.connect(masterGain);
+                
+                // Sharp attack, fast exponential decay
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.05 + (Math.random()*0.05), audioCtx.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1 + (Math.random()*0.2));
+                
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        function playChime() {
+            if (!isAudioInitialized || isMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+            osc.connect(gain);
+            gain.connect(masterGain);
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 2.1);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? '🔈' : '🔊';
+            if (masterGain) {
+                masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.6, audioCtx.currentTime, 0.1);
+            }
+        }
+        document.getElementById('mute-btn').addEventListener('click', toggleMute);
+
+        /**
+         * CANVAS GENERATIVE ENGINE
+         */
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let animationFrameId;
+
+        // Shared Entities
+        let nodes = [];
+        let particles = [];
+        let patternTime = 0;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initCanvasEntities();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function initCanvasEntities() {
+            // Room 3 Constellation Nodes
+            nodes = [
+                {x: width*0.3, y: height*0.3, label: 'Testing', vx: 0.1, vy: -0.1},
+                {x: width*0.7, y: height*0.2, label: 'QA', vx: -0.1, vy: 0.05},
+                {x: width*0.2, y: height*0.6, label: 'Android', vx: 0.05, vy: 0.1},
+                {x: width*0.8, y: height*0.7, label: 'Automotive', vx: -0.1, vy: -0.05},
+                {x: width*0.4, y: height*0.8, label: 'Automation', vx: 0.1, vy: -0.1},
+                {x: width*0.6, y: height*0.5, label: 'Tools', vx: -0.05, vy: 0.1},
+                {x: width*0.5, y: height*0.2, label: 'Coordination', vx: 0.1, vy: 0.1},
+                {x: width*0.25, y: height*0.85, label: 'Problem Solving', vx: -0.05, vy: -0.1},
+                {x: width*0.75, y: height*0.85, label: 'Leadership', vx: 0.05, vy: -0.05}
+            ];
+
+            // Room 7 Particles (Petals)
+            particles = [];
+            const numParticles = prefersReducedMotion ? 20 : 100;
+            for(let i=0; i<numParticles; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height - height,
+                    z: Math.random(), // 0 to 1 depth
+                    rot: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.1,
+                    type: Math.random() > 0.5 ? 'jasmine' : 'marigold'
+                });
+            }
+        }
+
+        function drawLoop() {
+            ctx.clearRect(0, 0, width, height);
+
+            if (currentRoom === 2) {
+                drawPattern();
+            } else if (currentRoom === 3) {
+                drawConstellation();
+            } else if (currentRoom === 7) {
+                drawParticles();
+            }
+
+            animationFrameId = requestAnimationFrame(drawLoop);
+        }
+
+        // Room 2: Code Grid to Kolam Transition
+        function drawPattern() {
+            patternTime += 0.005;
+            const progress = Math.min(1, Math.max(0, patternTime - 0.5)); // Delay start
+            
+            ctx.strokeStyle = palettes[2].accent;
+            ctx.fillStyle = palettes[2].accent;
+            ctx.lineWidth = 1;
+
+            const cx = width / 2;
+            const cy = height / 2;
+            const size = Math.min(width, height) * 0.4;
+            const gridCells = 10;
+            const step = size / gridCells;
+
+            ctx.beginPath();
+            for (let i = -gridCells; i <= gridCells; i++) {
+                for (let j = -gridCells; j <= gridCells; j++) {
+                    // Grid coords
+                    const gx = cx + i * step;
+                    const gy = cy + j * step;
+                    
+                    // Polar/Kolam coords
+                    const r = Math.sqrt(i*i + j*j) * step * 0.8;
+                    const theta = Math.atan2(j, i) + patternTime;
+                    const kx = cx + r * Math.cos(theta + Math.sin(r*0.05));
+                    const ky = cy + r * Math.sin(theta + Math.cos(r*0.05));
+
+                    // Interpolate
+                    const x = gx + (kx - gx) * progress;
+                    const y = gy + (ky - gy) * progress;
+
+                    // Draw dot
+                    ctx.fillRect(x - 1, y - 1, 2, 2);
+
+                    // Connect lines based on progress
+                    if (progress > 0.2 && Math.random() > 0.8) {
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(cx, cy);
+                    }
+                }
+            }
+            if (progress > 0.2) {
+                ctx.globalAlpha = (progress - 0.2) * 0.1;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // Room 3: Constellation
+        function drawConstellation() {
+            const cx = width / 2;
+            const cy = height / 2;
+            
+            ctx.strokeStyle = `rgba(140, 112, 80, 0.3)`;
+            ctx.fillStyle = palettes[3].main;
+            ctx.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue('--font-sans')}`;
+            ctx.textAlign = 'center';
+
+            // Update & Draw Nodes
+            nodes.forEach((n, i) => {
+                if (!prefersReducedMotion) {
+                    n.x += n.vx;
+                    n.y += n.vy;
+                    // Bounce
+                    if (n.x < 0 || n.x > width) n.vx *= -1;
+                    if (n.y < 0 || n.y > height) n.vy *= -1;
+                }
+
+                // Lines to center
+                ctx.beginPath();
+                ctx.moveTo(n.x, n.y);
+                ctx.lineTo(cx, cy);
+                ctx.stroke();
+
+                // Lines to others
+                nodes.forEach((n2, j) => {
+                    if (i < j) {
+                        const dist = Math.hypot(n.x - n2.x, n.y - n2.y);
+                        if (dist < 250) {
+                            ctx.beginPath();
+                            ctx.moveTo(n.x, n.y);
+                            ctx.lineTo(n2.x, n2.y);
+                            ctx.stroke();
+                        }
+                    }
+                });
+
+                // Node Point
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillText(n.label, n.x, n.y - 10);
+            });
+
+            // Center Node
+            ctx.fillStyle = palettes[3].accent;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.font = `bold 16px ${getComputedStyle(document.documentElement).getPropertyValue('--font-sans')}`;
+            ctx.letterSpacing = '0.2em';
+            ctx.fillText('NIHARIKA', cx, cy - 15);
+            ctx.letterSpacing = 'normal';
+        }
+
+        // Room 7: Celebration Petals
+        function drawParticles() {
+            particles.forEach(p => {
+                // Update
+                if (!prefersReducedMotion) {
+                    p.y += (p.z * 1.5 + 0.5); // Fall speed based on depth
+                    p.x += Math.sin(p.y * 0.01) * 0.5; // Sway
+                    p.rot += p.rotSpeed;
+                } else {
+                    p.y += 0.5;
+                }
+
+                // Reset at bottom
+                if (p.y > height + 20) {
+                    p.y = -20;
+                    p.x = Math.random() * width;
+                }
+
+                // Draw
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                
+                // Depth effects
+                const scale = p.z * 0.8 + 0.4;
+                ctx.scale(scale, scale);
+                ctx.globalAlpha = p.z * 0.6 + 0.4;
+                
+                // Draw petal shape
+                ctx.beginPath();
+                if (p.type === 'jasmine') {
+                    ctx.fillStyle = '#fff9f0';
+                    // Jasmine petal shape
+                    ctx.ellipse(0, 0, 4, 10, 0, 0, Math.PI*2);
+                } else {
+                    ctx.fillStyle = '#f2a65a';
+                    // Marigold petal shape
+                    ctx.ellipse(0, 0, 6, 8, 0, 0, Math.PI*2);
+                }
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+
+        /**
+         * NAVIGATION & ORCHESTRATION
+         */
+        
+        function updateUI() {
+            document.getElementById('room-indicator').innerText = `ROOM 0${currentRoom} / 0${TOTAL_ROOMS - 1}`;
+            document.getElementById('progress-line').style.width = `${(currentRoom / (TOTAL_ROOMS - 1)) * 100}%`;
+            
+            // Show UI layer after entering
+            if (currentRoom > 0) {
+                document.getElementById('ui-layer').classList.add('visible');
+            }
+            
+            // Show continue hint slightly delayed
+            const hint = document.getElementById('continue-hint');
+            hint.classList.remove('show');
+            if (currentRoom > 0 && currentRoom < TOTAL_ROOMS - 1) {
+                setTimeout(() => hint.classList.add('show'), 4000);
+            }
+        }
+
+        function triggerRoomSpecificEvents(index) {
+            // Room 0 -> 1: First enter
+            if (index === 1 && !isAudioInitialized) {
+                initAudio();
+            }
+
+            // Room 2: Reset pattern timer
+            if (index === 2) {
+                patternTime = 0;
+            }
+
+            // Room 4 (Reveal): Ghungroo audio
+            if (index === 4) {
+                if (ambientGain) ambientGain.gain.setTargetAtTime(0.02, audioCtx.currentTime, 1);
+                
+                // Sequence of ghungroo bursts mapping to text appearance
+                const textSpans = document.querySelectorAll('#reveal-text-container span');
+                textSpans.forEach(span => span.style.opacity = '0'); // Reset
+                
+                setTimeout(() => {
+                    playGhungrooBurst();
+                    textSpans[0].style.opacity = '1';
+                    textSpans[0].style.transform = 'translateY(0)';
+                }, 1500);
+                
+                setTimeout(() => {
+                    playGhungrooBurst();
+                    textSpans[1].style.opacity = '1';
+                    textSpans[1].style.transform = 'translateY(0)';
+                }, 3500);
+                
+                setTimeout(() => {
+                    playGhungrooBurst();
+                    playGhungrooBurst();
+                    textSpans[2].style.opacity = '1';
+                    textSpans[2].style.transform = 'translateY(0)';
+                }, 6000);
+            }
+
+            // Room 5: Stage audio
+            if (index === 5) {
+                if (ambientGain) ambientGain.gain.setTargetAtTime(0.1, audioCtx.currentTime, 2);
+            }
+
+            // Room 7: Celebration Chime
+            if (index === 7) {
+                playChime();
+            }
+        }
+
+        function goToRoom(index) {
+            if (isTransitioning || index < 0 || index >= TOTAL_ROOMS) return;
+            isTransitioning = true;
+            
+            // Directional classes for subtle spatial transition
+            const oldRoom = document.getElementById(`room-${currentRoom}`);
+            const newRoom = document.getElementById(`room-${index}`);
+            
+            if (index > currentRoom) {
+                oldRoom.classList.add('prev');
+            } else {
+                oldRoom.classList.remove('prev');
+            }
+            
+            oldRoom.classList.remove('active');
+            
+            setTimeout(() => {
+                currentRoom = index;
+                updatePalette(currentRoom);
+                newRoom.classList.remove('prev');
+                newRoom.classList.add('active');
+                
+                updateUI();
+                triggerRoomSpecificEvents(currentRoom);
+                
+                setTimeout(() => {
+                    isTransitioning = false;
+                }, 2000); // Increased from 1500 to prevent skipping animations too fast
+            }, 800); // Overlap slightly
+        }
+
+        // Input Handling
+        function handleNext() { goToRoom(currentRoom + 1); }
+        function handlePrev() { goToRoom(currentRoom - 1); }
+
+        // 1. Enter Button
+        document.getElementById('enter-btn').addEventListener('click', () => {
+            initAudio(); // Requires user gesture
+            handleNext();
+        });
+
+        // 2. Keyboard
+        window.addEventListener('keydown', (e) => {
+            if (currentRoom === 0) return; // Prevent skipping intro screen via keys
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') handleNext();
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') handlePrev();
+        });
+
+        // 3. Wheel/Scroll (Debounced)
+        let wheelTimeout;
+        window.addEventListener('wheel', (e) => {
+            if (currentRoom === 0 || isTransitioning) return;
+            if (Math.abs(e.deltaY) < 30) return; // Ignore tiny trackpad movements
+            
+            // Allow native scrolling in Room 7
+            if (currentRoom === 7) {
+                const room = document.getElementById('room-7');
+                if (room.scrollTop <= 0 && e.deltaY < 0) {
+                    // At top and scrolling up, proceed to previous room
+                } else {
+                    return; // Let user scroll within the room natively
+                }
+            }
+            
+            clearTimeout(wheelTimeout);
+            wheelTimeout = setTimeout(() => {
+                if (e.deltaY > 0) handleNext();
+                else handlePrev();
+            }, 100);
+        });
+
+        // 4. Touch Swipe
+        let touchStartY = 0;
+        window.addEventListener('touchstart', e => { touchStartY = e.changedTouches[0].screenY; }, {passive: true});
+        window.addEventListener('touchend', e => {
+            if (currentRoom === 0 || isTransitioning) return;
+            const touchEndY = e.changedTouches[0].screenY;
+            const diff = touchStartY - touchEndY;
+            
+            // Allow native scrolling in Room 7
+            if (currentRoom === 7) {
+                const room = document.getElementById('room-7');
+                if (room.scrollTop <= 0 && diff < -50) {
+                    // At top and swiping down, proceed to previous room
+                } else {
+                    return; // Let user scroll within the room natively
+                }
+            }
+
+            if (Math.abs(diff) > 50) { // Swipe threshold
+                if (diff > 0) handleNext();
+                else handlePrev();
+            }
+        }, {passive: true});
+
+        // 5. Hint Click
+        document.getElementById('continue-hint').addEventListener('click', handleNext);
+
+        /**
+         * INITIALIZATION
+         */
+        window.onload = () => {
+            // Intro Animation Trigger
+            setTimeout(() => {
+                const texts = document.querySelectorAll('#room-0 .fade-text');
+                texts.forEach((el, idx) => {
+                    setTimeout(() => el.classList.add('visible'), idx * 1000);
+                });
+            }, 500);
+
+            // Canvas Setup
+            resizeCanvas();
+            requestAnimationFrame(drawLoop);
+        };
+    </script>
+</body>
+</html>
